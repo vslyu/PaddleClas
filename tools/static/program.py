@@ -288,6 +288,7 @@ def create_optimizer(config):
     opt = OptimizerBuilder(config, **opt_config)
     return opt(lr), lr
 
+
 def create_strategy(config):
     """
     Create build strategy and exec strategy.
@@ -340,7 +341,6 @@ def create_strategy(config):
         logger.info("PaddlePaddle 2.0-rc or higher is "
                     "required when you want to enable addto strategy.")
     return build_strategy, exec_strategy
-
 
 
 def dist_optimizer(config, optimizer):
@@ -503,6 +503,9 @@ def run(dataloader,
     dataloader = dataloader if use_dali else dataloader()
     tic = time.time()
     for idx, batch in enumerate(dataloader):
+        # print("batch :{}".format(batch))
+        # print('step={} batch[0]={} place[1]={}'.format(idx, batch[0][0]._place(), batch[1][0]._place()))
+
         # ignore the warmup iters
         if idx == 5:
             batch_time.reset()
@@ -510,14 +513,19 @@ def run(dataloader,
             batch_size = batch[0]["feed_image"].shape()[0]
             feed_dict = batch[0]
         else:
-            batch_size = batch[0].shape()[0]
-            feed_dict = {
-                key.name: batch[idx]
-                for idx, key in enumerate(feeds.values())
-            }
+            device_count = len(batch)
+            batch_size = batch[0][0].shape()[0]
+            feed_dict = []
+            for i in range(device_count):
+                feed_dict_ = {
+                    key.name: batch[i][idx]
+                    for idx, key in enumerate(feeds.values())
+                }
+                feed_dict.append(feed_dict_)
         metrics = exe.run(program=program,
                           feed=feed_dict,
                           fetch_list=fetch_list)
+        #print('step={} feed={}'.format(idx, feed_dict))
         batch_time.update(time.time() - tic)
         for i, m in enumerate(metrics):
             metric_list[i].update(np.mean(m), batch_size)
@@ -562,6 +570,7 @@ def run(dataloader,
                     logger.coloring(fetchs_str, 'OKGREEN')))
 
         tic = time.time()
+        #print('step={}'.format(idx))
 
     end_str = ''.join([str(m.mean) + ' '
                        for m in metric_list] + [batch_time.total]) + 's'
@@ -579,3 +588,5 @@ def run(dataloader,
     # return top1_acc in order to save the best model
     if mode == 'valid':
         return fetchs["top1"][1].avg
+
+    print('-------step={}'.format(idx))

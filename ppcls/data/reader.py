@@ -179,6 +179,9 @@ class CommonDataset(Dataset):
         self.delimiter = params.get('delimiter', ' ')
         self.ops = create_operators(params['transforms'])
         self.num_samples = len(self.full_lines)
+        self.num_samples = int(
+            (self.num_samples) /
+            (2 * self.params['batch_size'])) * 2 * self.params['batch_size']
         return
 
     def __getitem__(self, idx):
@@ -254,7 +257,8 @@ class Reader:
             collate_fn=self.collate_fn if is_train else None,
             places=self.places,
             return_list=True,
-            num_workers=self.params["num_workers"])
+            num_workers=self.params["num_workers"],
+            use_shared_memory=False)
         return loader
 
 
